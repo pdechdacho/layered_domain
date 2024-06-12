@@ -1,0 +1,31 @@
+## prior to running you need to copy the reduced_mesh from the top & bottom DFN here (or symbolic link)
+## also copy the *pkl files
+# to run 
+# lagrit < combine_mesh.lgi 
+
+# read in mesh 1 
+read / reduced_mesh_top.inp / mo_top /
+# set material id to 1
+cmo / setatt / mo_top / itetclr / 1, 0, 0 / 1
+
+# Translate mesh up 5 meters
+trans / 1 0 0 / 0. 0. 0. / 0. 0. 5.
+
+
+# read in mesh 2 
+read / reduced_mesh_bottom.inp / mo_bottom /
+# set material if to 2 
+cmo / setatt / mo_bottom / itetclr / 1, 0, 0 / 2
+
+cmo / select / mo_bottom
+# Translate mesh up 5 meters
+trans / 1 0 0 / 0. 0. 0. / 0. 0. -5.
+
+# combine mesh 1 and mesh 2 to make final mesh
+addmesh / merge / mo_dfn / mo_top / mo_bottom
+
+# write to file 
+dump / combined_dfn.inp / mo_dfn 
+dump / reduced_mesh.inp / mo_dfn 
+
+finish 
