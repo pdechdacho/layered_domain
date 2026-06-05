@@ -4,7 +4,7 @@
 #   :maintainer: Jeffrey Hyman
 #.. moduleauthor:: Jeffrey Hyman <jhyman@lanl.gov>
 #"""
-
+import numpy as np 
 from pydfnworks import *
 import os
 
@@ -57,34 +57,55 @@ DFN.upscale(mat_perm=1e-15, mat_por=0.01)
 
 DFN.zone2ex(zone_file='all')
 
-### Grab fracture inflow nodes 
-import numpy as np 
 
-DFN.material_ids = np.genfromtxt('tag_frac.dat').astype(int)
+# """Extract fracture and matrix nodes on the left boundary."""
 
-## Tag cells and boundaries 
-matrix_id = np.where(DFN.material_ids == 1)[0]
-frac_id = np.where(DFN.material_ids == 2)[0]
+import numpy as np
+# Load material IDs for all cells/nodes.
+# Expected convention:
+#   1 = matrix
+#   2 = fracture
+DFN.material_ids = np.genfromtxt("tag_frac.dat").astype(int)
 
-boundary_ids = np.genfromtxt('boundary_left_w.ex', skip_header = 1)[:,0].astype(int)
-frac_boundary = list(set(frac_id).intersection(set(boundary_ids)))
- 
-with open('frac_left.txt', 'w') as fout:
-    for i in frac_boundary:
-        fout.write(f"{i+1}\n")
+# Get zero-based indices for matrix and fracture entries.
+matrix_ids = np.where(DFN.material_ids == 1)[0]
+fracture_ids = np.where(DFN.material_ids == 2)[0]
 
-matrix_boundary = list(set(matrix_id).intersection(set(boundary_ids)))
+# Load left-boundary IDs from the EX file.
+# The first line is a header, and the first column contains boundary IDs.
+boundary_ids = np.genfromtxt(
+    "boundary_left_w.ex",
+    skip_header=1,
+    usecols=0,
+).astype(int)
 
-with open('matrix_left.ex', 'w') as fout:
-    fout.write(f'CONNECTIONS\t\t{len(matrix_boundary)}\n')
-    with open('boundary_left_w.ex', 'r') as fin:
-        fin.readline() ## header
-        for line in fin.readlines():
-            index = int(line.split()[0])
-            if index in matrix_boundary:
+# Convert arrays to sets for fast membership checks.
+matrix_id_set = set(matrix_ids)
+fracture_id_set = set(fracture_ids)
+boundary_id_set = set(boundary_ids)
+
+# Identify fracture and matrix IDs that lie on the left boundary.
+fracture_boundary_ids = sorted(fracture_id_set & boundary_id_set)
+matrix_boundary_ids = sorted(matrix_id_set & boundary_id_set)
+
+# Write fracture boundary IDs.
+# Add 1 because the output file expects one-based indexing.
+with open("frac_left.txt", "w") as fout:
+    for node_id in fracture_boundary_ids:
+        fout.write(f"{node_id + 1}\n")
+
+# Write a filtered EX file containing only matrix boundary connections.
+with open("matrix_left.ex", "w") as fout:
+    fout.write(f"CONNECTIONS\t\t{len(matrix_boundary_ids)}\n")
+
+    with open("boundary_left_w.ex", "r") as fin:
+        next(fin)  # Skip header line.
+
+        for line in fin:
+            boundary_id = int(line.split()[0])
+
+            if boundary_id in matrix_boundary_ids:
                 fout.write(line)
-
-
 
 DFN.pflotran()
 DFN.parse_pflotran_h5() 
