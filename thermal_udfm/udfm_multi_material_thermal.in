@@ -1,0 +1,212 @@
+# Sept 12, 2018
+# Matthew Sweeney, Satish Karra, Jeffrey Hyman (LANL)
+#================================================
+
+
+SIMULATION
+  SIMULATION_TYPE SUBSURFACE
+  PROCESS_MODELS
+#    SUBSURFACE_TRANSPORT transport
+#      MODE GIRT
+#    /
+    SUBSURFACE_FLOW flow
+      MODE TH 
+    /
+#      OPTIONS
+#        STEADY_STATE
+      /
+    /
+  /
+END
+SUBSURFACE
+
+#=========================== discretization ===================================
+GRID
+  TYPE unstructured_explicit full_mesh.uge 
+  GRAVITY 0.d0 0.d0 0.d0
+END
+
+
+#=========================== fluid properties =================================
+FLUID_PROPERTY
+  DIFFUSION_COEFFICIENT 1.d-12
+END
+
+DATASET Permeability
+  FILENAME mesh_permeability.h5
+END
+
+DATASET Porosity
+  FILENAME mesh_porosity.h5
+END
+
+#=========================== material properties 
+#=========================== material properties ==============================
+MATERIAL_PROPERTY matrix 
+  ID 1
+  POROSITY DATASET Porosity
+  TORTUOSITY 0.1d0
+  CHARACTERISTIC_CURVES default
+  ROCK_DENSITY  5000.0 kg/m^3
+  SPECIFIC_HEAT 2 
+  THERMAL_CONDUCTIVITY_DRY 0.5
+  THERMAL_CONDUCTIVITY_WET 0.5
+  PERMEABILITY
+    DATASET Permeability
+  /
+END
+
+
+#=========================== material properties ==============================
+MATERIAL_PROPERTY fracture
+  ID 2
+  POROSITY DATASET Porosity
+  TORTUOSITY 0.75d0
+  CHARACTERISTIC_CURVES default
+  ROCK_DENSITY  2500.0 kg/m^3
+  SPECIFIC_HEAT 2
+  THERMAL_CONDUCTIVITY_DRY 1.5 
+  THERMAL_CONDUCTIVITY_WET 1.5
+  PERMEABILITY
+    DATASET Permeability
+  /
+END
+#=========================== characteristic curves ============================
+CHARACTERISTIC_CURVES default
+  SATURATION_FUNCTION VAN_GENUCHTEN
+    M 0.5d0
+    ALPHA  1.d-4
+    LIQUID_RESIDUAL_SATURATION 0.1d0
+    MAX_CAPILLARY_PRESSURE 1.d8
+  /
+  PERMEABILITY_FUNCTION MUALEM_VG_LIQ
+    M 0.5d0
+    LIQUID_RESIDUAL_SATURATION 0.1d0
+  /
+END
+
+#=========================== output options ===================================
+OUTPUT
+  PERIODIC TIME 1.0d-1 y
+  PRINT_PRIMAL_GRID
+  FORMAT HDF5 
+  MASS_BALANCE
+  VARIABLES
+    LIQUID_PRESSURE
+    PERMEABILITY_X
+    PERMEABILITY_Y
+    PERMEABILITY_Z
+    POROSITY
+    TEMPERATURE
+  /
+END
+
+#=========================== times ============================================
+TIME
+  INITIAL_TIMESTEP_SIZE  1.d-8 y
+  FINAL_TIME 1.0d1 y
+  MAXIMUM_TIMESTEP_SIZE 1.d0 y
+END
+
+#=========================== regions ==========================================
+REGION All
+  COORDINATES
+    -5.d20 -5.d20 -5.d20
+    5.d20 5.d20 5.d20
+  /
+END
+
+REGION inflow
+  FILE boundary_left_w.ex
+END
+
+REGION outflow
+  FILE boundary_right_e.ex
+END
+
+
+REGION matrix_left
+  FILE matrix_left.ex
+END
+
+REGION frac_left
+  FILE frac_left.txt
+END
+
+
+#=========================== flow conditions ==================================
+
+
+FLOW_CONDITION INITIAL
+  TYPE
+     LIQUID_PRESSURE dirichlet 
+     TEMPERATURE dirichlet
+/
+  LIQUID_PRESSURE 1.5d6
+  TEMPERATURE 25.d0 C
+END
+
+
+FLOW_CONDITION OUTFLOW 
+  TYPE 
+     LIQUID_PRESSURE dirichlet
+     TEMPERATURE zero_gradient 
+  /
+  LIQUID_PRESSURE 1.0d6
+  TEMPERATURE 25.d0 C
+END
+
+
+FLOW_CONDITION inflow_matrix
+  TYPE
+    LIQUID_PRESSURE dirichlet
+    TEMPERATURE dirichlet 
+/
+  LIQUID_PRESSURE 1.5d6
+  TEMPERATURE 25.d0 C
+END
+
+FLOW_CONDITION inflow_frac 
+  TYPE
+    LIQUID_PRESSURE dirichlet
+    TEMPERATURE dirichlet
+/
+  LIQUID_PRESSURE 1.5d6
+  TEMPERATURE 5.d0 C
+END
+
+#=========================== condition couplers ===============================
+# initial condition
+INITIAL_CONDITION
+  FLOW_CONDITION INITIAL
+  REGION All
+END
+
+# BOUNDARY_CONDITION INFLOW 
+#   FLOW_CONDITION INFLOW
+#   REGION inflow
+# END
+
+BOUNDARY_CONDITION OUTFLOW
+  FLOW_CONDITION OUTFLOW
+  REGION outflow
+END
+
+PRESCRIBED_CONDITION INFLOW_FRAC
+  FLOW_CONDITION inflow_frac
+  REGION frac_left
+END
+
+BOUNDARY_CONDITION INFLOW_MATRIX 
+  FLOW_CONDITION inflow_matrix 
+  REGION matrix_left  
+END
+
+
+#=========================== stratigraphy couplers ============================
+STRATA
+  FILE materials.h5
+END
+
+END_SUBSURFACE
+
